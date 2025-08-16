@@ -1,0 +1,312 @@
+# CyberMoriarty Lite — MVP (Taglish assistant, Android-ready via Buildozer)
+# Project structure (all files included below):
+#  - main.py
+#  - assistant.py
+#  - core/recon.py
+#  - core/scanner.py
+#  - ui.kv
+#  - requirements.txt
+#  - buildozer.spec (template)
+
+# ==========================
+# File: core/recon.py
+# ==========================
+import socket
+import requests
+from urllib.parse import urlparse
+
+
+def get_hostname_from_input(url_or_domain):
+    if not url_or_domain.startswith('http'):
+        url = 'http://' + url_or_domain
+    else:
+        url = url_or_domain
+    parsed = urlparse(url)
+    return parsed.netloc
+
+
+def recon(url_or_domain, timeout=5):
+    """Return basic recon info: ip, final_url, status_code, headers (subset)"""
+    host = get_hostname_from_input(url_or_domain)
+    result = {'host': host}
+    try:
+        ip = socket.gethostbyname(host)
+        result['ip'] = ip
+    except Exception as e:
+        result['ip_error'] = str(e)
+
+    try:
+        r = requests.get(('http://' + host), timeout=timeout)
+        result['final_url'] = r.url
+        result['status_code'] = r.status_code
+        # pick small set of headers useful for checks
+        headers = r.headers
+        result['server'] = headers.get('Server')
+        result['x_powered_by'] = headers.get('X-Powered-By')
+        result['content_type'] = headers.get('Content-Type')
+        result['uses_https'] = r.url.startswith('https://')
+    except Exception as e:
+        result['http_error'] = str(e)
+
+    return result
+
+# ==========================
+# File: core/scanner.py
+# ==========================
+import requests
+from urllib.parse import urljoin
+
+COMMON_ADMIN_PATHS = ['/admin', '/login', '/administrator', '/user/login', '/wp-admin']
+SECURITY_HEADERS = ['X-Frame-Options', 'Content-Security-Policy', 'X-Content-Type-Options', 'Strict-Transport-Security']
+
+
+def check_security_headers(url_or_domain, timeout=5):
+    host = url_or_domain
+    if not host.startswith('http'):
+        host = 'http://' + host
+    try:
+        r = requests.get(host, timeout=timeout)
+        missing = [h for h in SECURITY_HEADERS if h not in r.headers]
+        return missing
+    except Exception as e:
+        return {'error': str(e)}
+
+
+def find_admin_pages(url_or_domain, timeout=3):
+    host = url_or_domain
+    if not host.startswith('http'):
+        host = 'http://' + host
+    found = []
+    for p in COMMON_ADMIN_PATHS:
+        try:
+            url = urljoin(host, p)
+            r = requests.get(url, timeout=timeout)
+            if r.status_code == 200:
+                found.append(p)
+        except:
+            continue
+    return found
+
+
+def quick_xss_reflection_test(url_or_domain, timeout=5):
+    host = url_or_domain
+    if not host.startswith('http'):
+        host = 'http://' + host
+    payload = "<s1>moriarty_test</s1>"
+    try:
+        r = requests.get(host, params={'q': payload}, timeout=timeout)
+        if payload in r.text:
+            return True
+    except:
+        pass
+    return False
+
+# ==========================
+# File: assistant.py
+# ==========================
+import re
+
+# Very small rule-based Taglish assistant. Expandable later.
+
+INTENTS = {
+    'scan': [r'(?i)scan', r'(?i)check', r'(?i)tingnan', r'(?i)scan mo'],
+    'howto': [r'(?i)paano', r'(?i)how to', r'(?i)ano ang dapat'],
+    'greet': [r'(?i)hi', r'(?i)hello', r'(?i)kumusta'],
+    'thanks': [r'(?i)thanks', r'(?i)salamat']
+}
+
+
+def detect_intent(text: str):
+    for intent, patterns in INTENTS.items():
+        for p in patterns:
+            if re.search(p, text):
+                return intent
+    return 'unknown'
+
+
+def explain_recon(recon_result: dict):
+    # produce Taglish friendly explanation
+    parts = []
+    host = recon_result.get('host', 'unknown')
+    parts.append(f"Target: {host}")
+
+    if 'ip' in recon_result:
+        parts.append(f"IP address: {recon_result['ip']}")
+    else:
+        parts.append("Hindi ma-resolve ang domain — siguraduhin tama ang URL.")
+
+    if recon_result.get('uses_https'):
+        parts.append("✅ Gumagamit ng HTTPS — mas secure ang koneksyon.")
+    else:
+        parts.append("⚠️ Hindi naka-HTTPS. I-recommend na gumamit ng SSL/TLS para secure.")
+
+    server = recon_result.get('server') or recon_result.get('x_powered_by')
+    if server:
+        parts.append(f"Detected server/tech: {server}")
+
+    if 'http_error' in recon_result:
+        parts.append(f"HTTP error: {recon_result['http_error']}")
+
+    return '\n'.join(parts)
+
+
+def explain_scan_results(missing_headers, admin_pages, xss_possible):
+    parts = []
+    if isinstance(missing_headers, dict) and 'error' in missing_headers:
+        parts.append(f"Scan error: {missing_headers['error']}")
+        return '\n'.join(parts)
+
+    if not missing_headers:
+        parts.append("✅ Security headers OK (basic check).")
+    else:
+        parts.append(f"⚠️ Missing security headers: {', '.join(missing_headers)}")
+
+    if admin_pages:
+        parts.append(f"⚠️ Nakakita ng admin/login pages: {', '.join(admin_pages)} — siguraduhin secure ang access.")
+
+    if xss_possible:
+        parts.append("⚠️ Posibleng reflected XSS (basic test). Iwasan ang mga hindi sanitized na inputs.")
+
+    if not (missing_headers or admin_pages or xss_possible):
+        parts.append("🎉 Walang immediate issues na nakita sa basic checks.")
+
+    # give very simple action items in Taglish
+    parts.append('\nAction steps (madali):')
+    parts.append('- Mag-install ng SSL certificate kung wala.')
+    parts.append('- Gumamit ng strong passwords and limit admin access.')
+    parts.append('- Updateapang CMS o plugins regularly.')
+
+    return '\n'.join(parts)
+
+# ==========================
+# File: ui.kv
+# ==========================
+# Kivy language for layout (keeps design simple, mobile friendly)
+
+kv = '''
+<ScannerLayout>:
+    orientation: 'vertical'
+    padding: dp(12)
+    spacing: dp(10)
+
+    TextInput:
+        id: url_input
+        hint_text: 'Ilagay ang website (e.g. example.com)'
+        size_hint_y: None
+        height: dp(48)
+
+    Button:
+        text: 'Scan (Sari-Sari Mode)'
+        size_hint_y: None
+        height: dp(48)
+        on_press: app.run_full_check()
+
+    ScrollView:
+        do_scroll_x: False
+        do_scroll_y: True
+        GridLayout:
+            id: output_grid
+            cols: 1
+            size_hint_y: None
+            height: self.minimum_height
+
+    Button:
+        text: 'Switch to Pro Mode'
+        size_hint_y: None
+        height: dp(40)
+        on_press: app.switch_mode()
+'''
+
+# ==========================
+# File: main.py
+# ==========================
+from kivy.app import App
+from kivy.lang import Builder
+from kivy.metrics import dp
+from kivy.clock import mainthread
+
+from core.recon import recon
+from core.scanner import check_security_headers, find_admin_pages, quick_xss_reflection_test
+from assistant import detect_intent, explain_recon, explain_scan_results
+
+import threading
+
+Builder.load_string(kv)
+
+class ScannerLayout:
+    pass
+
+class CyberMoriartyApp(App):
+    def build(self):
+        self.mode = 'sari-sari'  # or 'pro'
+        root = Builder.load_string(kv)
+        return root
+
+    def switch_mode(self):
+        self.mode = 'pro' if self.mode == 'sari-sari' else 'sari-sari'
+        print('Mode switched to', self.mode)
+
+    def run_full_check(self):
+        # get URL from TextInput widget
+        url = self.root.ids.url_input.text.strip()
+        if not url:
+            self.show_output('❗ Please enter website/domain')
+            return
+
+        # run in background thread to avoid freezing UI
+        t = threading.Thread(target=self._background_check, args=(url,))
+        t.start()
+
+    def _background_check(self, url):
+        self.show_output('🔎 Nagsi-scan na si Moriarty...')
+        r = recon(url)
+        missing = check_security_headers(url)
+        admins = find_admin_pages(url)
+        xss = quick_xss_reflection_test(url)
+
+        recon_text = explain_recon(r)
+        scan_text = explain_scan_results(missing, admins, xss)
+
+        final = recon_text + '\n\n' + scan_text
+        self.show_output(final)
+
+    @mainthread
+    def show_output(self, text):
+        grid = self.root.ids.output_grid
+        grid.clear_widgets()
+        from kivy.uix.label import Label
+        lbl = Label(text=text, size_hint_y=None, height=dp(200))
+        lbl.text_size = (self.root.width - dp(24), None)
+        grid.add_widget(lbl)
+
+if __name__ == '__main__':
+    CyberMoriartyApp().run()
+
+# ==========================
+# File: requirements.txt
+# (used by buildozer)
+
+kivy==2.1.0
+requests
+
+# ==========================
+# File: buildozer.spec (minimal template)
+# ==========================
+# You will need to run 'buildozer init' and then replace the spec file with these values.
+
+[app]
+title = CyberMoriarty Lite
+package.name = cybermoriarty_lite
+package.domain = org.ciel
+source.dir = .
+version = 0.1
+
+requirements = python3,kivy==2.1.0,requests
+
+orientation = portrait
+
+# android
+android.api = 31
+android.minapi = 21
+
+# (end of spec)

@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CyberMoriarty Lite - Cybersecurity Scanner</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: #fff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 30px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+        
+        .scan-form {
+            margin-bottom: 30px;
+        }
+        
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        #url-input {
+            flex: 1;
+            padding: 15px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            background: rgba(255, 255, 255, 0.9);
+            color: #333;
+        }
+        
+        #url-input::placeholder {
+            color: #666;
+        }
+        
+        .btn {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary {
+            background: #ff6b6b;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #ff5252;
+            transform: translateY(-2px);
+        }
+        
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+            display: none;
+        }
+        
+        .loading .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 4px solid #ff6b6b;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .results {
+            display: none;
+            margin-top: 30px;
+        }
+        
+        .result-section {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .result-section h3 {
+            margin-bottom: 15px;
+            color: #ff6b6b;
+            border-bottom: 2px solid rgba(255, 107, 107, 0.3);
+            padding-bottom: 10px;
+        }
+        
+        .result-text {
+            line-height: 1.6;
+            white-space: pre-line;
+        }
+        
+        .help-section {
+            margin-top: 30px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 20px;
+        }
+        
+        .help-section h3 {
+            color: #4fc3f7;
+            margin-bottom: 15px;
+        }
+        
+        .help-list {
+            list-style: none;
+        }
+        
+        .help-list li {
+            padding: 5px 0;
+            padding-left: 20px;
+        }
+        
+        .help-list li:before {
+            content: "✓";
+            color: #4fc3f7;
+            font-weight: bold;
+            margin-left: -20px;
+            margin-right: 10px;
+        }
+        
+        .error {
+            background: rgba(255, 0, 0, 0.2);
+            border: 1px solid rgba(255, 0, 0, 0.5);
+            color: #ffcdd2;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .input-group {
+                flex-direction: column;
+            }
+            
+            #url-input, .btn {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔒 CyberMoriarty Lite</h1>
+            <p>Cybersecurity Scanner na Taglish - Para sa mga Filipino Security Practitioners</p>
+        </div>
+        
+        <div class="scan-form">
+            <div class="input-group">
+                <input type="text" id="url-input" placeholder="I-type ang website (example: google.com, facebook.com)">
+                <button class="btn btn-primary" onclick="startScan()">Scan Website</button>
+            </div>
+            <button class="btn btn-secondary" onclick="showHelp()">Show Help / Tulong</button>
+        </div>
+        
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>🔎 Nagsi-scan si Moriarty... Maghintay lang...</p>
+        </div>
+        
+        <div class="results" id="results">
+            <div class="result-section">
+                <h3>🔍 Reconnaissance Results</h3>
+                <div class="result-text" id="recon-results"></div>
+            </div>
+            
+            <div class="result-section">
+                <h3>🛡️ Security Analysis</h3>
+                <div class="result-text" id="security-results"></div>
+            </div>
+        </div>
+        
+        <div class="help-section">
+            <h3>🚀 Paano Gamitin ang CyberMoriarty Lite</h3>
+            <ul class="help-list">
+                <li>I-type ang website URL sa input box</li>
+                <li>Click ang "Scan Website" button</li>
+                <li>Maghintay sa results (mga 10-30 seconds)</li>
+                <li>Basahin ang Taglish explanations</li>
+                <li>Follow ang mga security recommendations</li>
+            </ul>
+            
+            <h3 style="margin-top: 20px;">🔍 Mga Features</h3>
+            <ul class="help-list">
+                <li>DNS resolution at IP address lookup</li>
+                <li>HTTPS/SSL status checking</li>
+                <li>Security headers analysis</li>
+                <li>Administrative pages discovery</li>
+                <li>Basic XSS reflection testing</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        async function startScan() {
+            const urlInput = document.getElementById('url-input');
+            const loading = document.getElementById('loading');
+            const results = document.getElementById('results');
+            const reconResults = document.getElementById('recon-results');
+            const securityResults = document.getElementById('security-results');
+            
+            const url = urlInput.value.trim();
+            if (!url) {
+                alert('Kulang ang URL! I-type ang website na gusto mo i-scan.');
+                return;
+            }
+            
+            // Show loading
+            loading.style.display = 'block';
+            results.style.display = 'none';
+            
+            try {
+                const response = await fetch('/scan', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ url: url })
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    showError(data.error);
+                    return;
+                }
+                
+                // Display results
+                reconResults.textContent = data.recon.explanation;
+                securityResults.textContent = data.security.explanation;
+                
+                loading.style.display = 'none';
+                results.style.display = 'block';
+                
+                // Scroll to results
+                results.scrollIntoView({ behavior: 'smooth' });
+                
+            } catch (error) {
+                showError('Network error: Hindi ma-connect sa server. Try again later.');
+                console.error('Scan error:', error);
+            }
+        }
+        
+        function showError(message) {
+            const loading = document.getElementById('loading');
+            const results = document.getElementById('results');
+            
+            loading.style.display = 'none';
+            
+            // Create error display
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error';
+            errorDiv.textContent = '❌ ' + message;
+            
+            // Remove existing error
+            const existingError = document.querySelector('.error');
+            if (existingError) {
+                existingError.remove();
+            }
+            
+            results.parentNode.insertBefore(errorDiv, results);
+            
+            // Auto remove after 5 seconds
+            setTimeout(() => {
+                errorDiv.remove();
+            }, 5000);
+        }
+        
+        function showHelp() {
+            alert(`🔒 CyberMoriarty Lite Help
+
+Mga commands:
+- I-type lang ang website URL
+- Click ang "Scan Website"
+- Maghintay sa results
+
+Examples:
+- google.com
+- facebook.com
+- https://example.com
+
+Lahat ng results ay in Taglish para madaling maintindihan!`);
+        }
+        
+        // Allow Enter key to start scan
+        document.getElementById('url-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                startScan();
+            }
+        });
+    </script>
+</body>
+</html>
