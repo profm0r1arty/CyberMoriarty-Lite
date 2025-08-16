@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 CyberMoriarty Lite - Web Interface
-A web-based cybersecurity reconnaissance tool with Taglish assistant interface
+A web-based cybersecurity pentesting tool with Taglish assistant interface
 """
 
 from flask import Flask, render_template, request, jsonify
