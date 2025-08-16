@@ -2,7 +2,7 @@
 
 ## Overview
 
-CyberMoriarty Lite is a mobile-friendly web security reconnaissance tool designed for Filipino cybersecurity practitioners. The application provides basic security scanning capabilities through a Taglish (Filipino-English) conversational interface, making cybersecurity tools more accessible to local users. Built with Kivy for cross-platform mobile deployment, it performs website reconnaissance, security header analysis, administrative interface discovery, and basic XSS testing.
+CyberMoriarty Lite is a mobile-friendly web security pentesting tool designed for Filipino cybersecurity practitioners. The application provides basic security scanning capabilities through a Taglish (Filipino-English) conversational interface, making cybersecurity tools more accessible to local users. Built with Kivy for cross-platform mobile deployment, it performs website reconnaissance, security header analysis, administrative interface discovery, and basic XSS testing.
 
 ## User Preferences
 
